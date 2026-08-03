@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Планировщик задач — Гант</title>
+<style>
+  :root{
+    --c-roma:#3866d6; --c-masha:#e0862b; --c-ba:#22a06b; --c-bi:#e0c22b; --c-ik:#8e44ad; --c-def:#8a94a6;
+    --sub-color:#5b7086;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#f4f6fb;color:#1e2330;margin:0;padding:14px;}
+  .wrap{max-width:1400px;margin:0 auto;}
+  .topbar{background:#fff;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.08);padding:12px 16px;margin-bottom:12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;}
+  .topbar h1{font-size:16px;margin:0;white-space:nowrap;}
+  .top-actions{display:flex;gap:8px;flex-wrap:wrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+  .btn{background:#4f6bed;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .btn:hover{background:#3c56d6;}
+  .btn.secondary{background:#eef1f8;color:#3a4256;}
+  .btn.secondary:hover{background:#dfe4f0;}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:#55607a;align-items:center;background:#f8f9fd;border-radius:8px;padding:6px 10px;}
+  .legend b{font-size:11.5px;color:#333;margin-right:2px;}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}
+  .sync{font-size:11.5px;color:#8a94a6;white-space:nowrap;}
+  .sync.ok{color:#1f7a4d;} .sync.err{color:#c62828;} .sync.pending{color:#8a6d1a;} .sync.offline{color:#8a6d1a;}
+
+  .board{background:#fff;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.08);overflow:auto;position:relative;}
+  .grid{display:flex;min-width:900px;}
+  .left-col{width:300px;min-width:300px;border-right:1px solid #eef0f5;position:sticky;left:0;background:#fff;z-index:5;}
+  .left-head{height:44px;border-bottom:1px solid #eef0f5;display:flex;align-items:center;padding:0 12px;font-size:12.5px;font-weight:700;color:#55607a;position:sticky;top:0;background:#fff;z-index:6;}
+  .right-col{flex:1;position:relative;}
+  .weeks-head{display:flex;height:44px;border-bottom:1px solid #eef0f5;position:sticky;top:0;background:#fff;z-index:4;}
+  .week-cell{min-width:74px;flex:0 0 74px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#55607a;border-right:1px dashed #eef0f5;font-weight:600;}
+  .week-cell.cur{background:#eef2ff;color:#3c56d6;}
+
+  .task-row{border-bottom:1px solid #eef0f5;}
+  .task-left{min-height:36px;padding:4px 10px;display:flex;align-items:center;gap:6px;}
+  .task-left input[type=checkbox]{flex:0 0 auto;}
+  .task-main{flex:1;min-width:0;}
+  .task-name{font-size:12px;font-weight:700;line-height:1.15;cursor:pointer;}
+  .task-goal{font-size:10px;color:#8a94a6;line-height:1.15;}
+  .task-progress{font-size:9.5px;color:#4f6bed;margin-top:1px;}
+  .icon-btn{background:none;border:none;cursor:pointer;font-size:12px;color:#8a94a6;padding:2px 4px;}
+  .icon-btn:hover{color:#3c56d6;}
+  .sub-row .task-left{padding-left:22px;min-height:28px;padding-top:3px;padding-bottom:3px;}
+  .sub-row .task-name{color:var(--sub-color);font-size:11.5px;}
+  .sub-row .task-goal{font-size:9.5px;}
+  .sub-row .task-progress{font-size:9px;}
+  .add-sub-btn{font-size:10px;color:#4f6bed;background:none;border:none;cursor:pointer;padding:2px 4px;margin-left:4px;}
+  .expand-btn{font-size:10px;color:#4f6bed;background:none;border:none;cursor:pointer;}
+
+  .lane{position:relative;min-height:36px;}
+  .sub-row .lane{min-height:28px;}
+  .bar{position:absolute;height:16px;border-radius:5px;font-size:10px;color:#fff;display:flex;align-items:center;padding:0 5px;overflow:hidden;white-space:nowrap;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.4);transition:z-index 0s, box-shadow .15s;}
+  .bar:hover{box-shadow:0 3px 10px rgba(0,0,0,.4);z-index:50 !important;}
+  .bar.done{opacity:.55;text-decoration:line-through;}
+  .bar .ic{margin-left:4px;font-size:9px;}
+  .rollup-bar.done-sub{opacity:.5;text-decoration:line-through;}
+
+  .tooltip{position:fixed;background:#1e2330;color:#fff;padding:8px 10px;border-radius:7px;font-size:11.5px;max-width:260px;z-index:200;pointer-events:none;line-height:1.4;display:none;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(20,24,35,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:16px;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:#fff;border-radius:12px;padding:18px 20px;max-width:520px;width:100%;max-height:88vh;overflow:auto;}
+  .modal h2{font-size:16px;margin:0 0 12px;}
+  .field{margin-bottom:10px;}
+  .field label{display:block;font-size:11.5px;color:#55607a;margin-bottom:3px;font-weight:600;}
+  .field input, .field textarea, .field select{width:100%;padding:8px 9px;border:1px solid #dfe3ee;border-radius:7px;font-size:13px;font-family:inherit;}
+  .stage-edit-block{border:1px solid #eef0f5;border-radius:8px;padding:8px;margin-bottom:8px;position:relative;background:#fafbfd;}
+  .stage-edit-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;}
+  .rm-stage{position:absolute;top:6px;right:6px;background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+
+  .popup{position:fixed;background:#fff;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:14px 16px;width:300px;max-width:90vw;z-index:150;display:none;max-height:80vh;overflow:auto;}
+  .popup.show{display:block;}
+  .popup h3{font-size:13.5px;margin:0 0 8px;}
+  .popup .field{margin-bottom:8px;}
+  .popup label{font-size:10.5px;color:#8a94a6;font-weight:600;}
+  .comment-item{font-size:11px;background:#f4f6fb;border-radius:6px;padding:5px 7px;margin-bottom:5px;}
+  .comment-item .d{color:#8a94a6;font-size:9.5px;}
+  .hist-item{font-size:11px;color:#55607a;margin-bottom:3px;}
+  .close-x{position:absolute;top:8px;right:10px;background:none;border:none;font-size:15px;cursor:pointer;color:#8a94a6;}
+
+  @media (max-width:700px){
+    body{padding:6px;}
+    .topbar{padding:10px 10px;}
+    .topbar h1{font-size:13px;}
+    .btn{padding:9px 12px;font-size:12px;}
+    .legend{font-size:10px;padding:5px 8px;}
+    .left-col{width:150px;min-width:150px;}
+    .left-head{height:40px;}
+    .weeks-head{height:40px;}
+    .week-cell{min-width:52px;flex:0 0 52px;font-size:9.5px;}
+    .task-name{font-size:11px;}
+    .task-goal{font-size:9px;}
+    .modal{padding:14px;max-height:94vh;}
+    .modal-overlay{padding:0;align-items:flex-end;}
+    .modal{width:100%;max-width:100%;border-radius:14px 14px 0 0;}
+    .field input, .field textarea, .field select{font-size:15px;padding:10px;}
+    .popup{width:92vw;}
+    .icon-btn{font-size:14px;padding:6px;}
+    .add-sub-btn, .expand-btn{font-size:11px;padding:4px 6px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <h1>📊 Планировщик задач</h1>
+    <div class="legend" id="legend">
+      <b>Цвета по ответственному:</b>
+      <span><span class="dot" style="background:var(--c-roma)"></span>Рома ДИ</span>
+      <span><span class="dot" style="background:var(--c-masha)"></span>Маша ДИ</span>
+      <span><span class="dot" style="background:var(--c-ba)"></span>БА</span>
+      <span><span class="dot" style="background:var(--c-bi)"></span>BI</span>
+      <span><span class="dot" style="background:var(--c-ik)"></span>Илья Копытов</span>
+    </div>
+    <div class="top-actions">
+      <span class="sync" id="syncStatus">Загрузка…</span>
+      <button class="btn secondary" id="refreshBtn">⟳ Обновить</button>
+      <button class="btn secondary" id="exportBtn">⭳ Резервная копия</button>
+      <button class="btn secondary" id="importBtn">⭱ Загрузить копию</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none">
+      <button class="btn" id="newTaskBtn">＋ Новая задача</button>
+    </div>
+  </div>
+
+  <div class="board" id="board">
+    <div class="grid" id="grid">
+      <div class="left-col" id="leftCol"><div class="left-head">Задачи</div></div>
+      <div class="right-col" id="rightCol"><div class="weeks-head" id="weeksHead"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <h2 id="createModalTitle">Новая задача</h2>
+    <div class="field"><label>Название</label><input id="cName"></div>
+    <div class="field"><label>Цель / бизнес-результат</label><textarea id="cGoal" rows="2"></textarea></div>
+    <div id="cStagesList"></div>
+    <button class="btn secondary" id="cAddStage" type="button">+ добавить этап</button>
+    <div class="modal-actions">
+      <button class="btn secondary" id="cCancel">Отмена</button>
+      <button class="btn" id="cSave">Создать</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>Редактировать</h2>
+    <div class="field"><label>Название</label><input id="eName"></div>
+    <div class="field"><label>Цель / описание</label><textarea id="eGoal" rows="2"></textarea></div>
+    <div id="eStagesWrap">
+      <div id="eStagesList"></div>
+      <button class="btn secondary" id="eAddStage" type="button">+ добавить этап</button>
+    </div>
+    <div id="eNoStagesNote" style="font-size:11.5px;color:#8a94a6;display:none;">У этой задачи есть подзадачи — этапы редактируются внутри подзадач.</div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="eCancel">Отмена</button>
+      <button class="btn" id="eSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="popup" id="stagePopup">
+  <button class="close-x" id="popupClose">✕</button>
+  <h3 id="popTitle">Этап</h3>
+  <div class="field"><label>Ответственный</label><input id="popResp"></div>
+  <div class="field"><label>Дедлайн (окончание)</label><input type="date" id="popEnd"></div>
+  <div class="field"><label>Дата начала</label><input type="date" id="popStart"></div>
+  <div style="display:flex;gap:6px;margin:8px 0;">
+    <button class="btn secondary" id="popToggleDone" style="flex:1">Завершить</button>
+    <button class="btn" id="popSaveBtn" style="flex:1">Сохранить</button>
+  </div>
+  <button class="btn secondary" id="popDelete" style="width:100%;margin-bottom:10px;background:#fdeceb;color:#c62828;">Удалить этап</button>
+
+  <div id="histBlock" style="margin-top:8px;">
+    <label>История переносов дедлайна</label>
+    <div id="histList"></div>
+  </div>
+
+  <div style="margin-top:10px;">
+    <label>Комментарии</label>
+    <div id="commentsList"></div>
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <input id="newComment" placeholder="Добавить комментарий…" style="flex:1;padding:6px 8px;border:1px solid #dfe3ee;border-radius:6px;font-size:12px;">
+      <button class="btn" id="addCommentBtn" style="padding:6px 10px;">+</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx25CAsbC-_lM9P81l_TkjbeNVUIrFTX6Q_Y05GqSa8sBcmeNpZR9_t0SNT5QaiuXHB/exec';
+const LOCAL_KEY = 'planner_gant_data_v2';
+const WEEK_MS = 7*24*60*60*1000;
+const DAY_MS = 24*60*60*1000;
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+const TODAY = todayStr();
+
+let state = { tasks: [] };
+let anyModalOpen = false;
+let pollTimer = null;
+let offlineMode = false;
+
+function uid(p){ return p+'_'+Date.now()+'_'+Math.floor(Math.random()*10000); }
+
+function colorFor(resp){
+  if(!resp) return 'var(--c-def)';
+  const r = resp.trim();
+  if(/ром[а]?\s*ди/i.test(r)) return getCss('--c-roma');
+  if(/маш[а]?\s*ди/i.test(r)) return getCss('--c-masha');
+  if(/илья\s*копытов/i.test(r)) return getCss('--c-ik');
+  if(/\bба\b/i.test(r)) return getCss('--c-ba');
+  if(/\bbi\b/i.test(r)) return getCss('--c-bi');
+  return getCss('--c-def');
+}
+function getCss(varName){ return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
+
+function stageObj(o){
+  return {
+    id: o.id || uid('s'),
+    name: o.name||'', responsible: o.responsible||'', start: o.start||TODAY, end: o.end||TODAY,
+    done: !!o.done, comments: o.comments||[], history: o.history||[]
+  };
+}
+function taskObj(o){
+  return {
+    id: o.id || uid('t'), name:o.name||'', goal:o.goal||'', done: !!o.done, expanded: o.expanded!==false,
+    subtasks: (o.subtasks||[]).map(st=>({
+      id: st.id||uid('st'), name:st.name||'', goal:st.goal||'', done: !!st.done,
+      stages: (st.stages||[]).map(stageObj)
+    })),
+    stages: (o.stages||[]).map(stageObj)
+  };
+}
+
+function saveLocal(){
+  try{ localStorage.setItem(LOCAL_KEY, JSON.stringify({tasks:state.tasks})); }catch(e){}
+}
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if(raw){ const json = JSON.parse(raw); return Array.isArray(json.tasks) ? json.tasks : []; }
+  }catch(e){}
+  return null;
+}
+
+async function fetchData(){
+  setSync('Загрузка…','pending');
+  try{
+    const r = await fetch(SCRIPT_URL, {method:'GET'});
+    if(!r.ok) throw new Error('status '+r.status);
+    const json = await r.json();
+    const tasks = Array.isArray(json.tasks) ? json.tasks : [];
+    state.tasks = tasks.map(taskObj);
+    offlineMode = false;
+    render();
+    saveLocal();
+    setSync('Синхронизировано ✓ '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),'ok');
+  }catch(err){
+    // fallback: работаем локально, если сервер недоступен (например, блокировка file://)
+    const localTasks = loadLocal();
+    if(localTasks){
+      state.tasks = localTasks.map(taskObj);
+      render();
+      offlineMode = true;
+      setSync('Офлайн-режим (локально)','offline');
+    } else if(state.tasks.length===0){
+      offlineMode = true;
+      render();
+      setSync('Офлайн-режим (локально)','offline');
+    } else {
+      setSync('Ошибка загрузки','err');
+    }
+  }
+}
+
+async function saveData(){
+  saveLocal();
+  if(offlineMode){
+    setSync('Сохранено локально (офлайн) '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),'offline');
+  }
+  try{
+    setSync('Сохранение…','pending');
+    const r = await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({tasks:state.tasks})});
+    if(!r.ok) throw new Error('status '+r.status);
+    offlineMode = false;
+    setSync('Сохранено ✓ '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),'ok');
+  }catch(err){
+    offlineMode = true;
+    setSync('Сохранено локально (офлайн) '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),'offline');
+  }
+}
+
+function setSync(text, cls){
+  const el = document.getElementById('syncStatus');
+  el.textContent = text;
+  el.className = 'sync '+cls;
+}
+
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(()=>{ if(!anyModalOpen) fetchData(); }, 25000);
+}
+
+function allStageDates(t){
+  let dates = [];
+  function collect(stages){ stages.forEach(s=>{ dates.push(s.start); dates.push(s.end); }); }
+  collect(t.stages);
+  t.subtasks.forEach(st=>collect(st.stages));
+  return dates;
+}
+
+function getRangeBounds(){
+  let min=null, max=null;
+  state.tasks.forEach(t=>{
+    allStageDates(t).forEach(d=>{
+      const dt = new Date(d);
+      if(!min||dt<min) min=dt;
+      if(!max||dt>max) max=dt;
+    });
+  });
+  const now = new Date(TODAY);
+  if(!min||now<min) min = now;
+  if(!max||now>max) max = now;
+  min = new Date(min.getTime() - 14*DAY_MS);
+  max = new Date(max.getTime() + 21*DAY_MS);
+  const day = min.getDay(); const diff = (day===0?-6:1-day);
+  min = new Date(min.getTime()+diff*DAY_MS);
+  return {min,max};
+}
+
+let rangeMin, rangeMax, totalWeeks;
+
+function dateToX(dateStr){
+  const d = new Date(dateStr);
+  const days = Math.floor((d - rangeMin)/DAY_MS);
+  return (days/7)*74;
+}
+function widthForRange(startStr, endStr){
+  const s = new Date(startStr), e = new Date(endStr);
+  let days = Math.floor((e-s)/DAY_MS)+1;
+  if(days<1) days=1;
+  return Math.max((days/7)*74, 24);
+}
+
+function render(){
+  renderWeeksHead();
+  renderLeftAndBars();
+}
+
+function renderWeeksHead(){
+  const bounds = getRangeBounds();
+  rangeMin = bounds.min; rangeMax = bounds.max;
+  totalWeeks = Math.ceil((rangeMax-rangeMin)/WEEK_MS);
+  const head = document.getElementById('weeksHead');
+  head.innerHTML='';
+  for(let i=0;i<totalWeeks;i++){
+    const wstart = new Date(rangeMin.getTime()+i*WEEK_MS);
+    const wend = new Date(wstart.getTime()+6*DAY_MS);
+    const cell = document.createElement('div');
+    cell.className='week-cell';
+    const now = new Date(TODAY);
+    if(now>=wstart && now<=wend) cell.classList.add('cur');
+    cell.textContent = wstart.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});
+    head.appendChild(cell);
+  }
+  head.style.width = (totalWeeks*74)+'px';
+}
+
+function subEarliestStart(st){
+  let min=null;
+  st.stages.forEach(s=>{ const d=new Date(s.start); if(!min||d<min) min=d; });
+  return min || new Date(TODAY);
+}
+
+function progressText(items, isSub){
+  if(isSub){
+    const total = items.length, done = items.filter(s=>s.done).length;
+    return done+'/'+total+' этапов';
+  }
+}
+
+function renderLeftAndBars(){
+  const leftCol = document.getElementById('leftCol');
+  const rightCol = document.getElementById('rightCol');
+  leftCol.innerHTML = '<div class="left-head">Задачи</div>';
+  rightCol.innerHTML = '';
+  const wh = document.getElementById('weeksHead');
+  rightCol.appendChild(wh);
+  const totalWidth = totalWeeks*74;
+
+  state.tasks.forEach(task=>{
+    const hasSubs = task.subtasks.length>0;
+    const sortedSubs = [...task.subtasks].sort((a,b)=>subEarliestStart(a)-subEarliestStart(b));
+
+    const leftRow = document.createElement('div');
+    leftRow.className='task-row';
+
+    const tLeft = document.createElement('div');
+    tLeft.className='task-left';
+    const cb = document.createElement('input'); cb.type='checkbox'; cb.checked=task.done;
+    cb.onchange=()=>{ task.done=cb.checked; saveData(); };
+    tLeft.appendChild(cb);
+    const main = document.createElement('div'); main.className='task-main';
+    const nameRow = document.createElement('div'); nameRow.style.display='flex'; nameRow.style.alignItems='center'; nameRow.style.gap='4px';
+    const nameEl = document.createElement('span'); nameEl.className='task-name'; nameEl.textContent = task.name;
+    nameRow.appendChild(nameEl);
+    const editIcon = document.createElement('button'); editIcon.className='icon-btn'; editIcon.textContent='✎';
+    editIcon.onclick=(e)=>{ e.stopPropagation(); openEditModal(task,null); };
+    nameRow.appendChild(editIcon);
+    const delIcon = document.createElement('button'); delIcon.className='icon-btn'; delIcon.textContent='🗑';
+    delIcon.onclick=(e)=>{ e.stopPropagation(); if(confirm('Удалить задачу целиком?')){ state.tasks = state.tasks.filter(t=>t.id!==task.id); render(); saveData(); } };
+    nameRow.appendChild(delIcon);
+    main.appendChild(nameRow);
+    if(task.goal){ const g=document.createElement('div'); g.className='task-goal'; g.textContent='Цель: '+task.goal; main.appendChild(g); }
+    const prog = document.createElement('div'); prog.className='task-progress';
+    if(hasSubs){
+      const doneSubs = task.subtasks.filter(s=>s.stages.length>0 && s.stages.every(x=>x.done)).length;
+      let stTotal=0, stDone=0; task.subtasks.forEach(s=>{stTotal+=s.stages.length; stDone+=s.stages.filter(x=>x.done).length;});
+      prog.textContent = doneSubs+'/'+task.subtasks.length+' подзадач · '+stDone+'/'+stTotal+' этапов';
+    } else {
+      prog.textContent = task.stages.filter(x=>x.done).length+'/'+task.stages.length+' этапов';
+    }
+    main.appendChild(prog);
+    const btnRow = document.createElement('div'); btnRow.style.marginTop='2px';
+    const addSubBtn = document.createElement('button'); addSubBtn.className='add-sub-btn'; addSubBtn.textContent='＋ Подзадача';
+    addSubBtn.onclick=(e)=>{ e.stopPropagation(); openCreateModal(task); };
+    btnRow.appendChild(addSubBtn);
+    if(hasSubs){
+      const expBtn = document.createElement('button'); expBtn.className='expand-btn'; expBtn.style.marginLeft='6px';
+      expBtn.textContent = (task.expanded?'▾ свернуть':'▸ развернуть')+' ('+task.subtasks.length+')';
+      expBtn.onclick=(e)=>{ e.stopPropagation(); task.expanded=!task.expanded; render(); saveData(); };
+      btnRow.appendChild(expBtn);
+    }
+    main.appendChild(btnRow);
+    tLeft.appendChild(main);
+    leftRow.appendChild(tLeft);
+
+    const lane = document.createElement('div'); lane.className='lane'; lane.style.width=totalWidth+'px';
+    if(hasSubs){
+      sortedSubs.forEach((st,idx)=>{
+        if(st.stages.length===0) return;
+        let minS=null, maxE=null;
+        st.stages.forEach(s=>{ const s1=new Date(s.start), e1=new Date(s.end); if(!minS||s1<minS)minS=s1; if(!maxE||e1>maxE)maxE=e1; });
+        const startStr = minS.toISOString().slice(0,10), endStr=maxE.toISOString().slice(0,10);
+        const bar = document.createElement('div'); bar.className='bar rollup-bar';
+        const allDone = st.stages.every(x=>x.done);
+        if(allDone) bar.classList.add('done-sub');
+        bar.style.left = dateToX(startStr)+'px';
+        bar.style.width = widthForRange(startStr,endStr)+'px';
+        bar.style.top = (6+idx*9)+'px';
+        bar.style.background = '#5b7086';
+        bar.style.zIndex = idx+1;
+        const doneCount = st.stages.filter(x=>x.done).length;
+        bar.textContent = st.name+' ('+doneCount+'/'+st.stages.length+')';
+        bar.onmouseenter=(e)=>showTooltip(e, st.name+'\n'+startStr+' — '+endStr+'\nЭтапов: '+doneCount+'/'+st.stages.length+(allDone?'\nПодзадача завершена':''));
+        bar.onmousemove=(e)=>moveTooltip(e);
+        bar.onmouseleave=hideTooltip;
+        bar.onclick=()=>{ task.expanded=true; render(); saveData(); };
+        lane.appendChild(bar);
+      });
+    } else {
+      task.stages.forEach((s,idx)=>renderStageBar(lane, s, task, null, idx));
+    }
+    leftCol.appendChild(leftRow);
+    rightCol.appendChild(lane);
+
+    if(hasSubs && task.expanded){
+      sortedSubs.forEach(st=>{
+        const subLeftRow = document.createElement('div'); subLeftRow.className='task-row sub-row';
+        const subLane = document.createElement('div'); subLane.className='lane sub-row'; subLane.style.width=totalWidth+'px';
+
+        const sLeft = document.createElement('div'); sLeft.className='task-left';
+        const scb = document.createElement('input'); scb.type='checkbox'; scb.checked = st.stages.length>0 && st.stages.every(x=>x.done);
+        scb.onchange=()=>{ st.stages.forEach(x=>x.done=scb.checked); render(); saveData(); };
+        sLeft.appendChild(scb);
+        const sMain = document.createElement('div'); sMain.className='task-main';
+        const sNameRow = document.createElement('div'); sNameRow.style.display='flex'; sNameRow.style.alignItems='center'; sNameRow.style.gap='4px';
+        const sName = document.createElement('span'); sName.className='task-name'; sName.textContent = st.name;
+        sNameRow.appendChild(sName);
+        const sEdit = document.createElement('button'); sEdit.className='icon-btn'; sEdit.textContent='✎';
+        sEdit.onclick=(e)=>{ e.stopPropagation(); openEditModal(task, st); };
+        sNameRow.appendChild(sEdit);
+        const sDel = document.createElement('button'); sDel.className='icon-btn'; sDel.textContent='🗑';
+        sDel.onclick=(e)=>{ e.stopPropagation(); if(confirm('Удалить подзадачу?')){ task.subtasks = task.subtasks.filter(x=>x.id!==st.id); render(); saveData(); } };
+        sNameRow.appendChild(sDel);
+        sMain.appendChild(sNameRow);
+        if(st.goal){ const g=document.createElement('div'); g.className='task-goal'; g.textContent=st.goal; sMain.appendChild(g); }
+        const sProg = document.createElement('div'); sProg.className='task-progress'; sProg.textContent = progressText(st.stages, true);
+        sMain.appendChild(sProg);
+        sLeft.appendChild(sMain);
+        subLeftRow.appendChild(sLeft);
+
+        st.stages.forEach((s,idx)=>renderStageBar(subLane, s, task, st, idx));
+
+        leftCol.appendChild(subLeftRow);
+        rightCol.appendChild(subLane);
+      });
+    }
+  });
+}
+
+function renderStageBar(lane, stage, task, subtask, idx){
+  const bar = document.createElement('div'); bar.className='bar';
+  if(stage.done) bar.classList.add('done');
+  bar.style.left = dateToX(stage.start)+'px';
+  bar.style.width = widthForRange(stage.start,stage.end)+'px';
+  bar.style.top = (6+idx*9)+'px';
+  bar.style.background = colorFor(stage.responsible);
+  bar.style.zIndex = idx+1;
+  bar.textContent = stage.name;
+  if(stage.comments && stage.comments.length){ const ic=document.createElement('span'); ic.className='ic'; ic.textContent='💬'; bar.appendChild(ic); }
+  if(stage.history && stage.history.length){ const ic2=document.createElement('span'); ic2.className='ic'; ic2.textContent='↻'; bar.appendChild(ic2); }
+  bar.onmouseenter=(e)=>{
+    let txt = stage.name+'\n'+stage.responsible+'\n'+stage.start+' — '+stage.end+(stage.done?'\nЗавершён':'\nВ работе');
+    if(stage.history && stage.history.length) txt+='\nПеренесён: '+stage.history.length+' раз(а)';
+    if(stage.comments && stage.comments.length) txt+='\nКомментариев: '+stage.comments.length;
+    showTooltip(e, txt);
+  };
+  bar.onmousemove=(e)=>moveTooltip(e);
+  bar.onmouseleave=hideTooltip;
+  bar.onclick=(e)=>{ e.stopPropagation(); openStagePopup(stage, task, subtask, e); };
+  lane.appendChild(bar);
+}
+
+function showTooltip(e, text){
+  const tip = document.getElementById('tooltip');
+  tip.textContent = text;
+  tip.style.display='block';
+  moveTooltip(e);
+}
+function moveTooltip(e){
+  const tip = document.getElementById('tooltip');
+  let x = e.clientX+14, y = e.clientY+10;
+  if(x+270>window.innerWidth) x = window.innerWidth-280;
+  tip.style.left = x+'px'; tip.style.top = y+'px';
+}
+function hideTooltip(){ document.getElementById('tooltip').style.display='none'; }
+
+let createTargetTask = null;
+function openCreateModal(parentTask){
+  createTargetTask = parentTask || null;
+  document.getElementById('createModalTitle').textContent = parentTask ? 'Новая подзадача для «'+parentTask.name+'»' : 'Новая задача';
+  document.getElementById('cName').value='';
+  document.getElementById('cGoal').value='';
+  document.getElementById('cStagesList').innerHTML='';
+  addStageRow('cStagesList');
+  anyModalOpen=true;
+  document.getElementById('createModal').classList.add('show');
+}
+function addStageRow(containerId, data){
+  data = data||{};
+  const wrap = document.createElement('div'); wrap.className='stage-edit-block';
+  wrap.innerHTML = `
+    <button type="button" class="rm-stage">✕</button>
+    <div class="stage-edit-row">
+      <div class="field"><label>Название этапа</label><input class="st-name" value="${data.name||''}"></div>
+      <div class="field"><label>Ответственный</label><input class="st-resp" value="${data.responsible||''}"></div>
+    </div>
+    <div class="stage-edit-row">
+      <div class="field"><label>Начало</label><input type="date" class="st-start" value="${data.start||TODAY}"></div>
+      <div class="field"><label>Дедлайн</label><input type="date" class="st-end" value="${data.end||TODAY}"></div>
+    </div>
+    <label style="font-size:10.5px;"><input type="checkbox" class="st-done" ${data.done?'checked':''}> завершён</label>
+  `;
+  wrap.querySelector('.rm-stage').onclick=()=>wrap.remove();
+  document.getElementById(containerId).appendChild(wrap);
+}
+document.getElementById('cAddStage').onclick=()=>addStageRow('cStagesList');
+document.getElementById('cCancel').onclick=()=>{ document.getElementById('createModal').classList.remove('show'); anyModalOpen=false; };
+document.getElementById('cSave').onclick=()=>{
+  const name = document.getElementById('cName').value.trim();
+  if(!name){ alert('Введите название'); return; }
+  const goal = document.getElementById('cGoal').value.trim();
+  const stages = readStagesFrom('cStagesList');
+  if(createTargetTask){
+    createTargetTask.subtasks.push({ id:uid('st'), name, goal, done:false, stages });
+    createTargetTask.expanded = true;
+  } else {
+    state.tasks.push(taskObj({ name, goal, stages }));
+  }
+  document.getElementById('createModal').classList.remove('show'); anyModalOpen=false;
+  render(); saveData();
+};
+function readStagesFrom(containerId){
+  const blocks = document.querySelectorAll('#'+containerId+' .stage-edit-block');
+  const arr=[];
+  blocks.forEach(b=>{
+    const name=b.querySelector('.st-name').value.trim();
+    if(!name) return;
+    arr.push(stageObj({
+      name, responsible:b.querySelector('.st-resp').value.trim(),
+      start:b.querySelector('.st-start').value, end:b.querySelector('.st-end').value,
+      done:b.querySelector('.st-done').checked
+    }));
+  });
+  return arr;
+}
+
+let editTargetTask=null, editTargetSub=null;
+function openEditModal(task, sub){
+  editTargetTask=task; editTargetSub=sub;
+  const obj = sub||task;
+  document.getElementById('eName').value=obj.name;
+  document.getElementById('eGoal').value=obj.goal||'';
+  document.getElementById('eStagesList').innerHTML='';
+  const hasOwnStages = sub ? true : task.subtasks.length===0;
+  if(hasOwnStages){
+    document.getElementById('eStagesWrap').style.display='block';
+    document.getElementById('eNoStagesNote').style.display='none';
+    (obj.stages||[]).forEach(s=>addStageRow('eStagesList', s));
+    if((obj.stages||[]).length===0) addStageRow('eStagesList');
+  } else {
+    document.getElementById('eStagesWrap').style.display='none';
+    document.getElementById('eNoStagesNote').style.display='block';
+  }
+  anyModalOpen=true;
+  document.getElementById('editModal').classList.add('show');
+}
+document.getElementById('eAddStage').onclick=()=>addStageRow('eStagesList');
+document.getElementById('eCancel').onclick=()=>{ document.getElementById('editModal').classList.remove('show'); anyModalOpen=false; };
+document.getElementById('eSave').onclick=()=>{
+  const obj = editTargetSub || editTargetTask;
+  obj.name = document.getElementById('eName').value.trim() || obj.name;
+  obj.goal = document.getElementById('eGoal').value.trim();
+  if(document.getElementById('eStagesWrap').style.display!=='none'){
+    obj.stages = readStagesFrom('eStagesList');
+  }
+  document.getElementById('editModal').classList.remove('show'); anyModalOpen=false;
+  render(); saveData();
+};
+
+let popupCtx = null;
+function openStagePopup(stage, task, subtask, e){
+  popupCtx = {stage, task, subtask};
+  document.getElementById('popTitle').textContent = stage.name;
+  document.getElementById('popResp').value = stage.responsible;
+  document.getElementById('popStart').value = stage.start;
+  document.getElementById('popEnd').value = stage.end;
+  document.getElementById('popToggleDone').textContent = stage.done ? 'Вернуть в работу' : 'Завершить';
+  renderComments();
+  renderHistory();
+  const pop = document.getElementById('stagePopup');
+  pop.classList.add('show');
+  let x = e.clientX, y = e.clientY;
+  const w = Math.min(300, window.innerWidth*0.9);
+  if(x+w>window.innerWidth) x = window.innerWidth-w-10;
+  if(y+400>window.innerHeight) y = Math.max(10, window.innerHeight-420);
+  pop.style.left = x+'px'; pop.style.top = y+'px';
+  anyModalOpen=true;
+}
+document.getElementById('popupClose').onclick=()=>{ document.getElementById('stagePopup').classList.remove('show'); anyModalOpen=false; };
+document.getElementById('popToggleDone').onclick=()=>{
+  popupCtx.stage.done = !popupCtx.stage.done;
+  document.getElementById('popToggleDone').textContent = popupCtx.stage.done ? 'Вернуть в работу' : 'Завершить';
+  render(); saveData();
+};
+document.getElementById('popDelete').onclick=()=>{
+  if(!confirm('Удалить этап?')) return;
+  const {task, subtask, stage} = popupCtx;
+  const arr = subtask ? subtask.stages : task.stages;
+  const i = arr.findIndex(s=>s.id===stage.id);
+  if(i>-1) arr.splice(i,1);
+  document.getElementById('stagePopup').classList.remove('show'); anyModalOpen=false;
+  render(); saveData();
+};
+document.getElementById('popSaveBtn').onclick=()=>{
+  const {stage} = popupCtx;
+  const newResp = document.getElementById('popResp').value.trim();
+  const newStart = document.getElementById('popStart').value;
+  const newEnd = document.getElementById('popEnd').value;
+  if(newEnd !== stage.end){
+    stage.history.push({from: stage.end, to:newEnd, date: TODAY});
+  }
+  stage.responsible = newResp;
+  stage.start = newStart;
+  stage.end = newEnd;
+  document.getElementById('stagePopup').classList.remove('show'); anyModalOpen=false;
+  render(); saveData();
+};
+document.getElementById('addCommentBtn').onclick=()=>{
+  const input = document.getElementById('newComment');
+  const text = input.value.trim();
+  if(!text) return;
+  popupCtx.stage.comments.push({text, date: TODAY});
+  input.value='';
+  renderComments();
+  render(); saveData();
+};
+function renderComments(){
+  const list = document.getElementById('commentsList');
+  list.innerHTML='';
+  (popupCtx.stage.comments||[]).forEach(c=>{
+    const d = document.createElement('div'); d.className='comment-item';
+    d.innerHTML = '<div>'+escapeHtml(c.text)+'</div><div class="d">'+c.date+'</div>';
+    list.appendChild(d);
+  });
+}
+function renderHistory(){
+  const list = document.getElementById('histList');
+  list.innerHTML='';
+  const hist = popupCtx.stage.history||[];
+  if(hist.length===0){ list.innerHTML='<div class="hist-item">Переносов не было</div>'; return; }
+  hist.forEach(h=>{
+    const d = document.createElement('div'); d.className='hist-item';
+    d.textContent = h.from+' → '+h.to+' (перенесено '+h.date+')';
+    list.appendChild(d);
+  });
+}
+function escapeHtml(s){ const div=document.createElement('div'); div.textContent=s; return div.innerHTML; }
+
+document.addEventListener('click', (e)=>{
+  const pop = document.getElementById('stagePopup');
+  if(pop.classList.contains('show') && !pop.contains(e.target) && !e.target.closest('.bar')){
+    pop.classList.remove('show'); anyModalOpen=false;
+  }
+});
+
+document.getElementById('newTaskBtn').onclick=()=>openCreateModal(null);
+document.getElementById('refreshBtn').onclick=()=>fetchData();
+document.getElementById('exportBtn').onclick=()=>{
+  const blob = new Blob([JSON.stringify({tasks:state.tasks}, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'планировщик_данные_'+TODAY+'.json';
+  a.click();
+};
+document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').onchange=(e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const json = JSON.parse(ev.target.result);
+      const tasks = Array.isArray(json.tasks) ? json.tasks : [];
+      const mode = confirm('Заменить текущие задачи загруженными? ОК — заменить, Отмена — добавить к текущим');
+      if(mode){
+        state.tasks = tasks.map(taskObj);
+      } else {
+        state.tasks = state.tasks.concat(tasks.map(taskObj));
+      }
+      render(); saveData();
+    }catch(err){
+      alert('Не удалось прочитать файл — проверьте формат JSON.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+};
+
+fetchData().then(startPolling);
+</script>
+</body>
+</html>
